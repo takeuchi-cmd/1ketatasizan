@@ -84,22 +84,37 @@
         // グローバル変数としてFirebase関連のオブジェクトを公開
         window.firebase = {};
 
-        // Canvas環境から提供されるグローバル変数を使用
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
+        // ------------------------------------------------------------
+        // ★★★ 外部環境（GitHub Pagesなど）で利用するための設定エリア ★★★
+        // 1. Firebaseコンソールから「プロジェクト設定」-> 「ウェブアプリ」で取得した設定を以下に貼り付けてください。
+        //    ※ [ YOUR_... ] の部分を、あなたのプロジェクトIDやAPIキーに置き換えてください。
+        const firebaseConfig = {
+  apiKey: "AIzaSy...（ここにAPIキーが入ります）",
+  authDomain: "my-project-id-12345.firebaseapp.com",
+  projectId: "my-project-id-12345",
+  storageBucket: "my-project-id-12345.appspot.com",
+  messagingSenderId: "1234567890",
+  appId: "1:1234567890:web:abcdef1234567890"
+};
+        
+        // 2. データベースのコレクション名
+        //    GitHub Pagesでは元のパスが使えないため、トップレベルのコレクション名を使用します。
+        const DB_COLLECTION_NAME = 'math_records_public'; 
+        const DOC_ID = 'best_times'; // 最高タイムを保存するシングルトンドキュメント
+        // ------------------------------------------------------------
+        
+        // 旧Canvas環境の変数は使用しない
+        const initialAuthToken = null; 
+        
         let app, db, auth;
         let userId = 'loading'; // ユーザーIDを保持
-        const DB_PATH = `artifacts/${appId}/public/data/math_records`;
-        const DOC_ID = 'best_times'; // 最高タイムを保存するシングルトンドキュメント
 
         // 認証と初期化
         async function initializeFirebase() {
             try {
-                if (!Object.keys(firebaseConfig).length) {
-                    console.error("Firebase config is missing or empty.");
-                    document.getElementById('status-message').textContent = 'データベース設定がありません。最高タイムの保存はできません。';
+                // Firebase Configがプレースホルダーでないか確認
+                if (firebaseConfig.projectId === "YOUR_PROJECT_ID") {
+                    document.getElementById('status-message').textContent = '⚠️ データベース設定が未入力です。Firebase設定情報を貼り付けてください。';
                     return;
                 }
                 
@@ -108,8 +123,7 @@
                 auth = getAuth(app);
 
                 window.firebase.db = db;
-                window.firebase.DB_PATH = DB_PATH;
-                window.firebase.DOC_ID = DOC_ID;
+                window.firebase.DB_COLLECTION_NAME = DB_COLLECTION_NAME;
 
                 // 認証状態の変更を監視
                 onAuthStateChanged(auth, async (user) => {
@@ -120,13 +134,9 @@
                         // 認証完了後、最高タイムのリスナーを開始
                         startBestTimeListener();
                     } else {
-                        // 認証が完了していない場合、匿名サインインを試みる
-                        console.log("Firebase Auth: Not signed in. Attempting sign-in...");
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
+                        // 外部環境ではカスタムトークンは使えないため、匿名サインインを試みる
+                        console.log("Firebase Auth: Not signed in. Attempting anonymous sign-in...");
+                        await signInAnonymously(auth);
                     }
                     // ローディングメッセージを非表示にする
                     document.getElementById('status-message').classList.add('hidden');
@@ -145,7 +155,7 @@
                 return;
             }
 
-            const docRef = doc(db, DB_PATH, DOC_ID);
+            const docRef = doc(db, DB_COLLECTION_NAME, DOC_ID);
 
             onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {
@@ -178,7 +188,7 @@
 
             const now = new Date();
             const todayDate = now.toISOString().split('T')[0];
-            const docRef = doc(db, DB_PATH, DOC_ID);
+            const docRef = doc(db, DB_COLLECTION_NAME, DOC_ID);
 
             try {
                 const docSnap = await getDoc(docRef);
@@ -231,7 +241,7 @@
                 return;
             }
             
-            const docRef = doc(db, DB_PATH, DOC_ID);
+            const docRef = doc(db, DB_COLLECTION_NAME, DOC_ID);
             const messageEl = document.getElementById('status-message');
 
             try {
